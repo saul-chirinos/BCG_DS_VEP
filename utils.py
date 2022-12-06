@@ -7,6 +7,13 @@ import seaborn as sns
 sns.set()
 
 
+def get_client_prices(data: pd.DataFrame):
+    sample_df = __feature_eng_prices(get_sample_df(), all=False)
+    sample_grouped = sample_df.groupby('id')[['price_var', 'price_fix']].mean().reset_index()
+    clients_at_risk = pd.merge(sample_grouped, data, left_on='id', right_on='client_id')
+    return clients_at_risk
+
+
 def __convert_date_dtype(data: pd.DataFrame):
     date_cols = [col for col in data if 'date' in col]
     data[date_cols] = data[date_cols].apply(lambda x: x.astype('datetime64'))
@@ -59,9 +66,12 @@ def __feature_eng_dates(data: pd.DataFrame):
     return data
 
 
-def __feature_eng_prices(data: pd.DataFrame):
+def __feature_eng_prices(data: pd.DataFrame, all: bool=True):
     data['price_var'] = data[['price_off_peak_var', 'price_peak_var', 'price_mid_peak_var']].mean(axis=1)
     data['price_fix'] = data[['price_off_peak_fix', 'price_peak_fix', 'price_mid_peak_fix']].mean(axis=1)
+
+    if not all:
+        return data
 
     # Get price difference across periods
     # Energy
@@ -107,6 +117,7 @@ def __get_percentiles(data: pd.DataFrame, col: str, q: int):
 
 def get_sample_df():
     sample_df = pd.read_csv('Data/sample_df.csv')
+    sample_df.sort_values(['id', 'price_date'], ascending=[0, 1]).reset_index(drop=True)
     return sample_df
 
 
@@ -115,13 +126,15 @@ def load_model():
     return model
 
 
-def plot_probabilities(data: pd.DataFrame, col: st.columns):
+def plot_probabilities(data: pd.DataFrame, threshold: float, col: st.columns):
     fig, ax = plt.subplots()
     ax.hist(data['Churn Probability'], bins=40)
+    ax.axvline(threshold, c='r', label='Threshold')
 
     ax.set_title('Churn Probability Distribution')
     ax.set_xlabel('Probability')
     ax.set_ylabel('# Clients')
+    ax.legend()
     col.pyplot(fig)
 
 
